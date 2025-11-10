@@ -1,7 +1,6 @@
 
 import * as admin from "firebase-admin";
 import { ImageAnnotatorClient } from "@google-cloud/vision";
-// Correct the import for algoliasearch to include the SearchClient type
 import algoliasearch, { type SearchClient } from "algoliasearch";
 import * as logger from "firebase-functions/logger";
 
@@ -16,12 +15,12 @@ const ALGOLIA_APP_ID = defineString("ALGOLIA_APP_ID");
 const ALGOLIA_ADMIN_KEY = defineString("ALGOLIA_ADMIN_KEY");
 const ALGOLIA_SEARCH_KEY = defineString("ALGOLIA_SEARCH_KEY");
 
-
 admin.initializeApp();
 
-// Initialize Algolia client lazily
-// Use the imported SearchClient type correctly
+// Lazily initialize clients to avoid timeout issues on cold start
 let algoliaClient: SearchClient | null = null;
+let visionClient: ImageAnnotatorClient | null = null;
+
 const getAlgoliaClient = (): SearchClient => {
     if (!algoliaClient) {
         const appId = ALGOLIA_APP_ID.value();
@@ -35,15 +34,19 @@ const getAlgoliaClient = (): SearchClient => {
     return algoliaClient;
 };
 
-const visionClient = new ImageAnnotatorClient();
+const getVisionClient = (): ImageAnnotatorClient => {
+    if (!visionClient) {
+        visionClient = new ImageAnnotatorClient();
+    }
+    return visionClient;
+};
 
-// This single function handles creations, updates, and deletions.
+
+// This function handles creations, updates, and deletions.
 export const syncUserToAlgolia = onDocumentWritten("users/{userId}", async (event) => {
     const objectID = event.params.userId;
-    // Get the index from the correctly initialized client
     const usersIndex = getAlgoliaClient().initIndex("users");
 
-    // If the document does not exist, it has been deleted.
     if (!event.data?.after.exists) {
         try {
             await usersIndex.deleteObject(objectID);
@@ -61,20 +64,11 @@ export const syncUserToAlgolia = onDocumentWritten("users/{userId}", async (even
         return;
     }
 
-    // We don't want to index sensitive data.
     const { privateData, email, ...rest } = newData;
+    const algoliaRecord: any = { objectID, ...rest };
 
-    const algoliaRecord: any = {
-        objectID,
-        ...rest,
-    };
-
-    // Add geolocation data for proximity search.
     if (newData.latitude && newData.longitude) {
-        algoliaRecord._geoloc = {
-            lat: newData.latitude,
-            lng: newData.longitude,
-        };
+        algoliaRecord._geoloc = { lat: newData.latitude, lng: newData.longitude };
     }
 
     try {
@@ -94,42 +88,30 @@ export const getAlgoliaConfig = onCall((request) => {
       throw new HttpsError('internal', 'Algolia configuration is missing on the server.');
   }
 
-  return {
-    appId: appId,
-    searchKey: searchKey,
-  };
+  return { appId: appId, searchKey: searchKey };
 });
 
 
 /**
- * Triggered when a new image is uploaded to the profilePictures/ directory.
- * It uses the Google Cloud Vision API to detect inappropriate content.
- * If the image is flagged as adult or violent, it is deleted from Storage.
+ * Triggered when a new image is uploaded, moderates it using Google Cloud Vision API.
  */
 export const moderateProfilePicture = onObjectFinalized(async (event) => {
-    const object = event.data;
-    
-    // We only want to moderate images in the profilePictures folder.
-    if (!object.name?.startsWith("profilePictures/")) {
-        logger.log(`File ${object.name} is not a profile picture. Ignoring.`);
-        return null;
-    }
-    // Ignore folder creation events and non-image files.
-    if (object.contentType?.endsWith("/") || !object.contentType?.startsWith("image/")) {
-        logger.log(`File ${object.name} is a folder or not an image. Ignoring.`);
+    const { bucket, name, contentType } = event.data;
+
+    if (!name?.startsWith("profilePictures/") || contentType?.endsWith("/") || !contentType?.startsWith("image/")) {
+        logger.log(`File ${name} is not an image in profilePictures/ folder. Ignoring.`);
         return null;
     }
 
-    const bucketName = object.bucket;
-    const filePath = object.name;
-    const gcsUri = `gs://${bucketName}/${filePath}`;
+    const gcsUri = `gs://${bucket}/${name}`;
 
     try {
-      const [result] = await visionClient.safeSearchDetection(gcsUri);
+      const vision = getVisionClient();
+      const [result] = await vision.safeSearchDetection(gcsUri);
       const safeSearch = result.safeSearchAnnotation;
 
       if (!safeSearch) {
-        logger.log(`No safe search annotation for ${filePath}.`);
+        logger.log(`No safe search annotation for ${name}.`);
         return null;
       }
 
@@ -137,15 +119,15 @@ export const moderateProfilePicture = onObjectFinalized(async (event) => {
       const isViolent = safeSearch.violence === "LIKELY" || safeSearch.violence === "VERY_LIKELY";
 
       if (isAdult || isViolent) {
-        logger.warn(`Inappropriate image detected: ${filePath}. Deleting...`);
-        const bucket = admin.storage().bucket(bucketName);
-        await bucket.file(filePath).delete();
+        logger.warn(`Inappropriate image detected: ${name}. Deleting...`);
+        const storageBucket = admin.storage().bucket(bucket);
+        await storageBucket.file(name).delete();
       } else {
-        logger.log(`Image ${filePath} is clean.`);
+        logger.log(`Image ${name} is clean.`);
       }
       return null;
     } catch (error) {
-      logger.error(`Error analyzing image ${filePath}:`, error);
+      logger.error(`Error analyzing image ${name}:`, error);
       return null;
     }
 });
