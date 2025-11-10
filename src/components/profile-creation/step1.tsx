@@ -13,14 +13,16 @@ import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '../ui/button';
-import { Camera, Image as ImageIcon, Loader2, Trash2, UploadCloud } from 'lucide-react';
+import { Loader2, Trash2, UploadCloud } from 'lucide-react';
 import { useState, useRef } from 'react';
 import Image from 'next/image';
+import { Capacitor } from '@capacitor/core';
+import { Camera } from '@capacitor/camera';
 
 const MAX_PHOTOS = 6;
 
 const Step1 = () => {
-  const { control, setValue, getValues, trigger } = useFormContext();
+  const { control, setValue, getValues } = useFormContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -29,19 +31,18 @@ const Step1 = () => {
     if (!files) return;
 
     setIsUploading(true);
-    const currentPictures = getValues('profilePictures') || [];
-    const newPictures: string[] = [];
-
-    const filePromises = Array.from(files).map(file => {
-      return new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = e => resolve(e.target?.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-    });
-
+    
     try {
+      const currentPictures = getValues('profilePictures') || [];
+      const filePromises = Array.from(files).map(file => {
+        return new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = e => resolve(e.target?.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      });
+
       const results = await Promise.all(filePromises);
       const allPictures = [...currentPictures, ...results];
       setValue('profilePictures', allPictures.slice(0, MAX_PHOTOS), { shouldValidate: true });
@@ -49,10 +50,64 @@ const Step1 = () => {
       console.error("Error reading files:", error);
     } finally {
       setIsUploading(false);
-      // Reset file input to allow selecting the same file again
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
+    }
+  };
+
+  const handlePhotoUploadClick = async () => {
+    if (!Capacitor.isNativePlatform()) {
+      // Web flow
+      fileInputRef.current?.click();
+      return;
+    }
+
+    // Mobile flow
+    try {
+        let permission = await Camera.checkPermissions();
+        if (permission.photos !== 'granted') {
+            permission = await Camera.requestPermissions({ permissions: ['photos'] });
+        }
+
+        if (permission.photos !== 'granted') {
+            alert("L'accès à la galerie est requis pour ajouter des photos.");
+            return;
+        }
+        
+        const currentPictures = getValues('profilePictures') || [];
+        if (currentPictures.length >= MAX_PHOTOS) {
+            alert(`Vous ne pouvez ajouter que ${MAX_PHOTOS} photos au maximum.`);
+            return;
+        }
+
+        const result = await Camera.pickImages({
+            quality: 90,
+            limit: MAX_PHOTOS - currentPictures.length,
+        });
+
+        if (result.photos.length > 0) {
+            setIsUploading(true);
+            const newPicturesPromises = result.photos.map(async (photo) => {
+                const response = await fetch(photo.webPath!);
+                const blob = await response.blob();
+                return new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result as string);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(blob);
+                });
+            });
+
+            const newBase64Pictures = await Promise.all(newPicturesPromises);
+            const allPictures = [...currentPictures, ...newBase64Pictures];
+            setValue('profilePictures', allPictures.slice(0, MAX_PHOTOS), { shouldValidate: true });
+        }
+    } catch (error) {
+        console.error("Erreur lors de la sélection des photos :", error);
+        alert("Une erreur est survenue lors de la sélection des photos.");
+    } finally {
+        setIsUploading(false);
     }
   };
 
@@ -143,7 +198,7 @@ const Step1 = () => {
         <FormField
           control={control}
           name="profilePictures"
-          render={({ field }) => (
+          render={() => (
             <FormItem>
                 <FormLabel>Vos photos de profil (1 à 6)</FormLabel>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -164,7 +219,7 @@ const Step1 = () => {
                   {pictures.length < MAX_PHOTOS && (
                     <div 
                       className="aspect-square flex items-center justify-center border-2 border-dashed border-muted-foreground rounded-md cursor-pointer hover:bg-muted"
-                      onClick={() => fileInputRef.current?.click()}
+                      onClick={handlePhotoUploadClick}
                     >
                       <div className="text-center text-muted-foreground">
                         {isUploading ? (
@@ -194,7 +249,6 @@ const Step1 = () => {
             </FormItem>
           )}
         />
-
 
          <FormField
           control={control}
