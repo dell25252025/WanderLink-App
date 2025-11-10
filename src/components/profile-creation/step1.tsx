@@ -87,7 +87,7 @@ const Step1 = () => {
         // Show the prompt to choose between Camera or Photos
         const image = await Camera.getPhoto({
             quality: 90,
-            allowEditing: true, // Allows user to crop/edit the photo
+            allowEditing: false, // Set to false to simplify the process
             resultType: CameraResultType.DataUrl, // Get photo as base64 string
             source: CameraSource.Prompt, // Prompt user to select source
         });
