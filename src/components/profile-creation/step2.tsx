@@ -71,7 +71,12 @@ const Step2 = () => {
         }
       }
 
-      const position = await Geolocation.getCurrentPosition();
+      // Get position with increased timeout and lower accuracy for better compatibility
+      const position = await Geolocation.getCurrentPosition({ 
+        timeout: 15000, 
+        enableHighAccuracy: false 
+      });
+
       const { latitude, longitude } = position.coords;
       const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=fr`);
       const data = await response.json();
