@@ -1,7 +1,8 @@
 
 import * as admin from "firebase-admin";
 import { ImageAnnotatorClient } from "@google-cloud/vision";
-import algoliasearch from "algoliasearch";
+// Correct the import for algoliasearch to include the SearchClient type
+import algoliasearch, { type SearchClient } from "algoliasearch";
 import * as logger from "firebase-functions/logger";
 
 // Import v2 functions
@@ -19,8 +20,9 @@ const ALGOLIA_SEARCH_KEY = defineString("ALGOLIA_SEARCH_KEY");
 admin.initializeApp();
 
 // Initialize Algolia client lazily
-let algoliaClient: algoliasearch.SearchClient | null = null;
-const getAlgoliaClient = () => {
+// Use the imported SearchClient type correctly
+let algoliaClient: SearchClient | null = null;
+const getAlgoliaClient = (): SearchClient => {
     if (!algoliaClient) {
         const appId = ALGOLIA_APP_ID.value();
         const adminKey = ALGOLIA_ADMIN_KEY.value();
@@ -38,6 +40,7 @@ const visionClient = new ImageAnnotatorClient();
 // This single function handles creations, updates, and deletions.
 export const syncUserToAlgolia = onDocumentWritten("users/{userId}", async (event) => {
     const objectID = event.params.userId;
+    // Get the index from the correctly initialized client
     const usersIndex = getAlgoliaClient().initIndex("users");
 
     // If the document does not exist, it has been deleted.
