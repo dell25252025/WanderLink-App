@@ -17,7 +17,7 @@ import { Loader2, Trash2, UploadCloud } from 'lucide-react';
 import { useState, useRef } from 'react';
 import Image from 'next/image';
 import { Capacitor } from '@capacitor/core';
-import { Camera } from '@capacitor/camera';
+import { Camera, CameraSource, CameraResultType } from '@capacitor/camera';
 
 const MAX_PHOTOS = 6;
 
@@ -26,12 +26,12 @@ const Step1 = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
 
+  // Web-only file selection handler
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files) return;
 
     setIsUploading(true);
-    
     try {
       const currentPictures = getValues('profilePictures') || [];
       const filePromises = Array.from(files).map(file => {
@@ -56,58 +56,50 @@ const Step1 = () => {
     }
   };
 
+  // Main handler for both Web and Mobile
   const handlePhotoUploadClick = async () => {
     if (!Capacitor.isNativePlatform()) {
-      // Web flow
+      // Web flow: trigger the hidden file input
       fileInputRef.current?.click();
       return;
     }
 
-    // Mobile flow
+    // Mobile flow: use Capacitor Camera
+    const currentPictures = getValues('profilePictures') || [];
+    if (currentPictures.length >= MAX_PHOTOS) {
+        alert(`Vous avez atteint le maximum de ${MAX_PHOTOS} photos.`);
+        return;
+    }
+
     try {
-        let permission = await Camera.checkPermissions();
-        if (permission.photos !== 'granted') {
-            permission = await Camera.requestPermissions({ permissions: ['photos'] });
+        // Request both camera and photos permissions together
+        let permissions = await Camera.checkPermissions();
+        if (permissions.camera !== 'granted' || permissions.photos !== 'granted') {
+            permissions = await Camera.requestPermissions({ permissions: ['camera', 'photos'] });
         }
 
-        if (permission.photos !== 'granted') {
-            alert("L'accès à la galerie est requis pour ajouter des photos.");
-            return;
-        }
-        
-        const currentPictures = getValues('profilePictures') || [];
-        if (currentPictures.length >= MAX_PHOTOS) {
-            alert(`Vous ne pouvez ajouter que ${MAX_PHOTOS} photos au maximum.`);
+        // If any permission is still denied, show an alert and stop
+        if (permissions.camera !== 'granted' || permissions.photos !== 'granted') {
+            alert("L'accès à la caméra et à la galerie est requis pour ajouter des photos.");
             return;
         }
 
-        const result = await Camera.pickImages({
+        // Show the prompt to choose between Camera or Photos
+        const image = await Camera.getPhoto({
             quality: 90,
-            limit: MAX_PHOTOS - currentPictures.length,
+            allowEditing: true, // Allows user to crop/edit the photo
+            resultType: CameraResultType.DataUrl, // Get photo as base64 string
+            source: CameraSource.Prompt, // Prompt user to select source
         });
 
-        if (result.photos.length > 0) {
-            setIsUploading(true);
-            const newPicturesPromises = result.photos.map(async (photo) => {
-                const response = await fetch(photo.webPath!);
-                const blob = await response.blob();
-                return new Promise<string>((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => resolve(reader.result as string);
-                    reader.onerror = reject;
-                    reader.readAsDataURL(blob);
-                });
-            });
-
-            const newBase64Pictures = await Promise.all(newPicturesPromises);
-            const allPictures = [...currentPictures, ...newBase64Pictures];
-            setValue('profilePictures', allPictures.slice(0, MAX_PHOTOS), { shouldValidate: true });
+        if (image.dataUrl) {
+            const updatedPictures = [...currentPictures, image.dataUrl];
+            setValue('profilePictures', updatedPictures, { shouldValidate: true });
         }
+
     } catch (error) {
-        console.error("Erreur lors de la sélection des photos :", error);
-        alert("Une erreur est survenue lors de la sélection des photos.");
-    } finally {
-        setIsUploading(false);
+        // This error can happen if the user cancels the photo selection
+        console.info("Photo selection cancelled or failed:", error);
     }
   };
 
@@ -235,6 +227,7 @@ const Step1 = () => {
                   )}
                 </div>
                  <FormControl>
+                    {/* This input is now only for the web flow */}
                     <input
                       type="file"
                       ref={fileInputRef}
