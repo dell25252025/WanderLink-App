@@ -22,7 +22,7 @@ import { getUserProfile } from '@/lib/firebase-actions';
 import type { DocumentData } from 'firebase/firestore';
 import { Loader2, Search, Crown } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import * as algoliasearch from 'algoliasearch/lite';
+import algoliasearch from 'algoliasearch/lite';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { functions } from '@/lib/firebase';
 
@@ -42,7 +42,7 @@ export default function DiscoverPage() {
 
     const algoliaClient = useMemo(() => {
         if (algoliaConfig) {
-            return (algoliasearch as any).default(algoliaConfig.appId, algoliaConfig.searchKey);
+            return algoliasearch(algoliaConfig.appId, algoliaConfig.searchKey);
         }
         return null;
     }, [algoliaConfig]);
