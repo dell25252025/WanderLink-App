@@ -21,6 +21,7 @@ import { getUserProfile } from '@/lib/firebase-actions';
 import type { DocumentData } from 'firebase/firestore';
 import { Loader2, Search, Crown } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { algoliasearch } from 'algoliasearch/lite';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { functions } from '@/lib/firebase';
 
@@ -36,8 +37,14 @@ export default function DiscoverPage() {
     const [isPremiumDialogOpen, setIsPremiumDialogOpen] = useState(false);
     const [algoliaConfig, setAlgoliaConfig] = useState<{ appId: string, searchKey: string } | null>(null);
     const [isSearching, setIsSearching] = useState(false);
-    const [algoliaClient, setAlgoliaClient] = useState<any>(null);
 
+
+    const algoliaClient = useMemo(() => {
+        if (algoliaConfig) {
+            return algoliasearch(algoliaConfig.appId, algoliaConfig.searchKey);
+        }
+        return null;
+    }, [algoliaConfig]);
 
     const usersIndex = useMemo(() => {
         if (algoliaClient) {
@@ -90,36 +97,6 @@ export default function DiscoverPage() {
         });
         return () => unsubscribe();
     }, [router]);
-
-    useEffect(() => {
-        const initializeAlgolia = async () => {
-            if (algoliaConfig && !algoliaClient) {
-                try {
-                    const algoliasearchModule = await import('algoliasearch/lite');
-
-                    // --- ALGOLIA DEBUG ---
-                    console.log("--- ALGOLIA DEBUG START ---");
-                    console.log("Module content:", JSON.stringify(algoliasearchModule));
-                    console.log("Module keys:", Object.keys(algoliasearchModule));
-                    console.log("Is .default a function?", typeof algoliasearchModule.default);
-                    console.log("Is .algoliasearch a function?", typeof algoliasearchModule.algoliasearch);
-                    console.log("--- ALGOLIA DEBUG END ---");
-
-                    const algoliasearch = algoliasearchModule.algoliasearch || algoliasearchModule.default;
-                    if (typeof algoliasearch === 'function') {
-                        const client = algoliasearch(algoliaConfig.appId, algoliaConfig.searchKey);
-                        setAlgoliaClient(client);
-                    } else {
-                        console.error('Failed to import algoliasearch as a function.');
-                    }
-                } catch (error) {
-                    console.error("Error dynamically importing Algolia:", error);
-                }
-            }
-        };
-
-        initializeAlgolia();
-    }, [algoliaConfig, algoliaClient]);
 
 
     const handleNearbyChange = (checked: boolean) => {

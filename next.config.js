@@ -35,6 +35,11 @@ const nextConfig = {
       }
     ],
   },
+  webpack: (config, options) => {
+    config.resolve.alias['algoliasearch'] = 'algoliasearch/lite';
+    config.resolve.alias['algoliasearch/lite'] = 'algoliasearch/lite';
+    return config;
+  }
 };
 
 module.exports = nextConfig;
