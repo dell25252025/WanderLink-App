@@ -96,7 +96,7 @@ export default function DiscoverPage() {
             if (algoliaConfig && !algoliaClient) {
                 try {
                     const algoliasearchModule = await import('algoliasearch/lite');
-                    const algoliasearch = algoliasearchModule.default;
+                    const algoliasearch = algoliasearchModule.algoliasearch;
                     if (typeof algoliasearch === 'function') {
                         const client = algoliasearch(algoliaConfig.appId, algoliaConfig.searchKey);
                         setAlgoliaClient(client);
@@ -331,7 +331,7 @@ export default function DiscoverPage() {
                 </div>
             </main>
             <footer className="fixed bottom-0 z-10 w-full p-2 bg-background/80 backdrop-blur-sm border-t">
-                <Button onClick={handleSearch} size="lg" className="w-full" disabled={isSearching}>
+                <Button onClick={handleSearch} size="lg" className="w-full" disabled={isSearching || !algoliaClient}>
                     {isSearching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
                     {isSearching ? 'Recherche...' : 'Recherche'}
                 </Button>
