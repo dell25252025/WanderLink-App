@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
@@ -30,15 +29,35 @@ function DiscoverPage({ user }: { user: User }) {
     async function fetchProfiles() {
       try {
         setProfilesLoading(true);
-        // Let's limit the number of users we fetch to improve performance
-        const [userProfile, users] = await Promise.all([
-          getUserProfile(user.uid),
-          getAllUsers(12), // Fetch a limited number of users
-        ]);
-        setCurrentUserProfile(userProfile);
-        const otherUsers = users.filter(u => u.id !== user.uid);
-        setAllUsers(otherUsers);
-        setDisplayMatches(otherUsers); // Initially display the fetched users
+        // Check for search results in localStorage
+        const searchResultsJSON = localStorage.getItem('searchResults');
+        const searchTimestamp = localStorage.getItem('searchTimestamp');
+        
+        // Clear old search results after 5 minutes
+        if (searchTimestamp && Date.now() - parseInt(searchTimestamp, 10) > 5 * 60 * 1000) {
+            localStorage.removeItem('searchResults');
+            localStorage.removeItem('searchTimestamp');
+        }
+
+        if (searchResultsJSON) {
+            const searchResults = JSON.parse(searchResultsJSON);
+            setDisplayMatches(searchResults);
+            // Optionally, clear the stored results so they aren't shown on next visit
+            localStorage.removeItem('searchResults');
+            localStorage.removeItem('searchTimestamp');
+
+        } else {
+            // No search results, fetch default users
+            const [userProfile, users] = await Promise.all([
+              getUserProfile(user.uid),
+              getAllUsers(12), // Fetch a limited number of users
+            ]);
+            setCurrentUserProfile(userProfile);
+            const otherUsers = users.filter(u => u.id !== user.uid);
+            setAllUsers(otherUsers);
+            setDisplayMatches(otherUsers);
+        }
+
       } catch (error) {
         console.error("Failed to fetch profiles:", error);
         toast({ variant: 'destructive', title: 'Error fetching profiles' });
@@ -49,15 +68,6 @@ function DiscoverPage({ user }: { user: User }) {
     fetchProfiles();
   }, [user, toast]);
   
-  // Minimal filtering logic can be added back here if needed
-  useEffect(() => {
-    // This effect can be expanded later to re-introduce filtering logic
-    // For now, it just ensures displayMatches is populated from allUsers
-    if (allUsers.length > 0) {
-      setDisplayMatches(allUsers);
-    }
-  }, [allUsers, searchParams]);
-
 
   const getMappedProfiles = (profiles: DocumentData[]): UserProfile[] => {
       return profiles.map(p => ({
@@ -102,7 +112,7 @@ function DiscoverPage({ user }: { user: User }) {
                       ))}
                     </div>
                   ) : (
-                    <p className="text-muted-foreground mt-8">Aucun autre profil trouvé.</p>
+                    <p className="text-muted-foreground mt-8">Aucun profil ne correspond à votre recherche.</p>
                   )}
                 </div>
               </>

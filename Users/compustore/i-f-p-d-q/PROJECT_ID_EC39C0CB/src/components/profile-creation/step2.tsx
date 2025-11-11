@@ -18,6 +18,7 @@ import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Geolocation } from '@capacitor/geolocation';
 import { Capacitor } from '@capacitor/core';
+import { countries } from '@/lib/countries';
 
 const allLanguages = [
     { id: 'fr', label: 'Français' },
@@ -58,31 +59,59 @@ const Step2 = () => {
   const [isLocating, setIsLocating] = useState(false);
   const { toast } = useToast();
 
-  const requestAndLocate = async () => {
+  const requestAndLocate = async (isAutomatic = false) => {
     setIsLocating(true);
     try {
       if(Capacitor.isNativePlatform()){
-        await Geolocation.requestPermissions();
+        let permissions = await Geolocation.checkPermissions();
+        if (permissions.location !== 'granted') {
+          if (isAutomatic) { // Don't prompt on initial load
+              setIsLocating(false);
+              return;
+          }
+          permissions = await Geolocation.requestPermissions();
+        }
+
+        if (permissions.location !== 'granted') {
+          toast({ variant: 'destructive', title: "Permission refusée", description: "Veuillez autoriser la géolocalisation dans les paramètres de votre appareil." });
+          setIsLocating(false);
+          return;
+        }
       }
-      const coordinates = await Geolocation.getCurrentPosition();
+      const coordinates = await Geolocation.getCurrentPosition({
+          timeout: 10000,
+          enableHighAccuracy: false
+      });
       const { latitude, longitude } = coordinates.coords;
-      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=fr`);
+      // Using a reverse geocoding service that returns country code
+      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=en&zoom=3`);
       const data = await response.json();
 
-      if (data?.address?.country) {
-        setValue('location', data.address.country, { shouldValidate: true });
-        toast({ title: "Position trouvée !", description: `Pays défini sur : ${data.address.country}` });
+      const countryCode = data?.address?.country_code?.toUpperCase();
+
+      if (countryCode) {
+        const foundCountry = countries.find(c => c.code === countryCode);
+        if (foundCountry) {
+          setValue('location', foundCountry.name, { shouldValidate: true });
+           if (!isAutomatic) {
+            toast({ title: "Position trouvée !", description: `Pays défini sur : ${foundCountry.name}` });
+           }
+        } else {
+             if (!isAutomatic) toast({ variant: 'destructive', title: "Pays non reconnu", description: `Le code pays '${countryCode}' n'a pas été trouvé.`});
+        }
       } else {
-        throw new Error("Pays non trouvé dans la réponse de l'API.");
+        if (!isAutomatic) throw new Error("Pays non trouvé dans la réponse de l'API.");
       }
 
     } catch (error: any) {
       console.error("Error during geolocation:", error);
-       toast({
-        variant: 'destructive',
-        title: "Erreur de géolocalisation",
-        description: error.message || 'Impossible de récupérer la position. Veuillez la sélectionner manuellement.',
-      });
+      if (!isAutomatic) {
+        toast({
+            variant: 'destructive',
+            title: "Erreur de géolocalisation",
+            description: error.message || 'Impossible de récupérer la position. Veuillez la sélectionner manuellement.',
+        });
+      }
     } finally {
       setIsLocating(false);
     }
@@ -91,7 +120,7 @@ const Step2 = () => {
   useEffect(() => {
     const currentLocation = getValues('location');
     if (!currentLocation) {
-      requestAndLocate();
+      requestAndLocate(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -121,7 +150,7 @@ const Step2 = () => {
                 )}
               />
               <Separator />
-               <Button type="button" variant="outline" onClick={requestAndLocate} disabled={isLocating} className="w-full">
+               <Button type="button" variant="outline" onClick={() => requestAndLocate(false)} disabled={isLocating} className="w-full">
                   {isLocating ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
