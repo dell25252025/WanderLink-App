@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import algoliasearch from 'algoliasearch/lite';
+import { liteClient as algoliasearch } from 'algoliasearch/lite';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
