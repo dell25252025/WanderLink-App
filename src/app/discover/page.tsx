@@ -24,7 +24,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { functions } from '@/lib/firebase';
 
-
 // Initialize Algolia
 const getAlgoliaConfig = httpsCallable(functions, 'getAlgoliaConfig');
 
@@ -37,7 +36,6 @@ export default function DiscoverPage() {
     const [algoliaConfig, setAlgoliaConfig] = useState<{ appId: string, searchKey: string } | null>(null);
     const [isSearching, setIsSearching] = useState(false);
     const [algoliaClient, setAlgoliaClient] = useState<any>(null);
-
 
     const usersIndex = useMemo(() => {
         if (algoliaClient) {
@@ -96,36 +94,13 @@ export default function DiscoverPage() {
             if (algoliaConfig && !algoliaClient) {
                 try {
                     const algoliasearchModule = await import('algoliasearch/lite');
+                    const algoliasearch = algoliasearchModule.liteClient;
 
-                    console.log("--- ALGOLIA DEBUG START ---");
-                    console.log("ALGOLIA DEBUG: Module received.");
-
-                    try {
-                        const keys = Object.keys(algoliasearchModule);
-                        console.log("ALGOLIA DEBUG: Module keys are:", keys.join(', '));
-
-                        for (const key of keys) {
-                            try {
-                                console.log(`ALGOLIA DEBUG: Type of module['${key}'] is`, typeof algoliasearchModule[key]);
-                            } catch (e) {
-                                console.log(`ALGOLIA DEBUG: Could not access module['${key}']`);
-                            }
-                        }
-                    } catch (e) {
-                        console.log("ALGOLIA DEBUG: Could not get object keys.");
-                    }
-
-                    console.log("ALGOLIA DEBUG: typeof .default is", typeof algoliasearchModule.default);
-                    console.log("ALGOLIA DEBUG: typeof .algoliasearch is", typeof algoliasearchModule.algoliasearch);
-                    console.log("--- ALGOLIA DEBUG END ---");
-
-
-                    const algoliasearch = algoliasearchModule.algoliasearch || algoliasearchModule.default;
                     if (typeof algoliasearch === 'function') {
                         const client = algoliasearch(algoliaConfig.appId, algoliaConfig.searchKey);
                         setAlgoliaClient(client);
                     } else {
-                        console.error('Failed to import algoliasearch as a function.');
+                        console.error('Failed to import algoliasearch: algoliasearchModule.liteClient is not a function.');
                     }
                 } catch (error) {
                     console.error("Error dynamically importing Algolia:", error);
@@ -135,7 +110,6 @@ export default function DiscoverPage() {
 
         initializeAlgolia();
     }, [algoliaConfig, algoliaClient]);
-
 
     const handleNearbyChange = (checked: boolean) => {
         if (!userProfile?.isPremium && !checked) {
@@ -196,7 +170,6 @@ export default function DiscoverPage() {
             setIsSearching(false);
         }
     };
-    
     
     const handlePremiumFeatureClick = () => {
         if (!userProfile?.isPremium) {
