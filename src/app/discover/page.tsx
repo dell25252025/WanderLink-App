@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import algoliasearch from 'algoliasearch/lite';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -38,7 +39,6 @@ export default function DiscoverPage() {
     const [isSearching, setIsSearching] = useState(false);
     const [algoliaClient, setAlgoliaClient] = useState<any>(null);
 
-
     const usersIndex = useMemo(() => {
         if (algoliaClient) {
             return algoliaClient.initIndex("users");
@@ -72,15 +72,21 @@ export default function DiscoverPage() {
                             setShowMe('Femme');
                         }
                     }
-                    setLoading(false);
+                    // setLoading(false) is now called after Algolia config is fetched
                 });
 
                 getAlgoliaConfig()
                     .then((result) => {
-                        setAlgoliaConfig(result.data as any);
+                        const config = result.data as { appId: string, searchKey: string };
+                        setAlgoliaConfig(config);
+                        const client = algoliasearch(config.appId, config.searchKey);
+                        setAlgoliaClient(client);
                     })
                     .catch((error) => {
                         console.error("Error fetching Algolia config:", error);
+                    })
+                    .finally(() => {
+                        setLoading(false); // Stop loading after all setup is done
                     });
 
             } else {
@@ -90,45 +96,6 @@ export default function DiscoverPage() {
         });
         return () => unsubscribe();
     }, [router]);
-
-    useEffect(() => {
-        const initializeAlgolia = async () => {
-            if (algoliaConfig && !algoliaClient) {
-                try {
-                    const algoliasearchModule = await import('algoliasearch');
-
-                    console.log("--- ALGOLIA DEBUGGER --- START ---");
-
-                    try {
-                        const keys = Object.keys(algoliasearchModule);
-                        console.log("ALGOLIA KEYS:", keys.join(', '));
-
-                        for (const key of keys) {
-                            console.log(`ALGOLIA TYPEOF [${key}] is`, typeof algoliasearchModule[key]);
-                        }
-                    } catch (e) {
-                        console.log("ALGOLIA ERROR: Could not get object keys.");
-                    }
-
-                    console.log("ALGOLIA TYPEOF [.default] is", typeof algoliasearchModule.default);
-                    console.log("--- ALGOLIA DEBUGGER --- END ---");
-
-
-                    const algoliasearch = algoliasearchModule.default || algoliasearchModule;
-                    if (typeof algoliasearch === 'function') {
-                        const client = algoliasearch(algoliaConfig.appId, algoliaConfig.searchKey);
-                        setAlgoliaClient(client);
-                    } else {
-                        console.error('Failed to import algoliasearch as a function.');
-                    }
-                } catch (error) {
-                    console.error("Error dynamically importing Algolia:", error);
-                }
-            }
-        };
-
-        initializeAlgolia();
-    }, [algoliaConfig, algoliaClient]);
 
 
     const handleNearbyChange = (checked: boolean) => {
@@ -167,7 +134,7 @@ export default function DiscoverPage() {
         if (activities && activities !== 'Toutes' && userProfile.isPremium) filters.push(`activities:"${activities}"`);
     
         // Ensure we don't find the current user in the results
-        filters.push(`NOT objectID:${userProfile.id}`);
+        filters.push(`NOT objectID:${currentUser?.uid}`);
     
         const searchOptions: any = {
             filters: filters.join(' AND '),
@@ -201,7 +168,7 @@ export default function DiscoverPage() {
     const uniformSelectClass = "w-3/5 md:w-[45%] h-9 text-sm";
     const isPremium = userProfile?.isPremium ?? false;
 
-    if (loading || !algoliaConfig) {
+    if (loading) {
          return (
             <div className="flex h-screen w-full flex-col items-center justify-center bg-background">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
