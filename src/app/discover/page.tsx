@@ -230,7 +230,7 @@ export default function DiscoverPage() {
                         >
                           <ToggleGroupItem value="Homme" aria-label="Montrer les hommes" className="text-sm h-9">Homme</ToggleGroupItem>
                           <ToggleGroupItem value="Femme" aria-label="Montrer les femmes" className="text-sm h-9">Femme</ToggleGroupItem>
-                          <ToggleGroupItem value="Autre" aria-label="Montrer les autres personnes" className="text-sm h-9">Autre</Toggle_group_item>
+                          <ToggleGroupItem value="Autre" aria-label="Montrer les autres personnes" className="text-sm h-9">Autre</ToggleGroupItem>
                         </ToggleGroup>
                       </div>
                     </div>
