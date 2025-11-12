@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-=import * as algoliasearch from 'algoliasearch/lite'; // Correct import method
+import * as algoliasearch from 'algoliasearch/lite'; // Correct import method
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -77,7 +77,6 @@ export default function DiscoverPage() {
                     .then((result) => {
                         const config = result.data as { appId: string, searchKey: string };
                         
-                        // Robust way to get the search function, as suggested by AI
                         const algoliaSearchFunction = (algoliasearch as any).default || algoliasearch;
 
                         if (typeof algoliaSearchFunction === 'function') {
