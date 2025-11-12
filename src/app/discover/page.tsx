@@ -97,13 +97,28 @@ export default function DiscoverPage() {
                 try {
                     const algoliasearchModule = await import('algoliasearch/lite');
 
-                    // --- ALGOLIA DEBUG ---
                     console.log("--- ALGOLIA DEBUG START ---");
-                    console.log("Module content:", JSON.stringify(algoliasearchModule));
-                    console.log("Module keys:", Object.keys(algoliasearchModule));
-                    console.log("Is .default a function?", typeof algoliasearchModule.default);
-                    console.log("Is .algoliasearch a function?", typeof algoliasearchModule.algoliasearch);
+                    console.log("ALGOLIA DEBUG: Module received.");
+
+                    try {
+                        const keys = Object.keys(algoliasearchModule);
+                        console.log("ALGOLIA DEBUG: Module keys are:", keys.join(', '));
+
+                        for (const key of keys) {
+                            try {
+                                console.log(`ALGOLIA DEBUG: Type of module['${key}'] is`, typeof algoliasearchModule[key]);
+                            } catch (e) {
+                                console.log(`ALGOLIA DEBUG: Could not access module['${key}']`);
+                            }
+                        }
+                    } catch (e) {
+                        console.log("ALGOLIA DEBUG: Could not get object keys.");
+                    }
+
+                    console.log("ALGOLIA DEBUG: typeof .default is", typeof algoliasearchModule.default);
+                    console.log("ALGOLIA DEBUG: typeof .algoliasearch is", typeof algoliasearchModule.algoliasearch);
                     console.log("--- ALGOLIA DEBUG END ---");
+
 
                     const algoliasearch = algoliasearchModule.algoliasearch || algoliasearchModule.default;
                     if (typeof algoliasearch === 'function') {
