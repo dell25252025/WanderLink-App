@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import * as algoliasearchNs from 'algoliasearch';
+import algoliasearch from 'algoliasearch/lite'; // Using the aliased version
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -25,6 +25,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { functions } from '@/lib/firebase';
 
+
 // Initialize Algolia
 const getAlgoliaConfig = httpsCallable(functions, 'getAlgoliaConfig');
 
@@ -34,7 +35,6 @@ export default function DiscoverPage() {
     const [userProfile, setUserProfile] = useState<DocumentData | null>(null);
     const [loading, setLoading] = useState(true);
     const [isPremiumDialogOpen, setIsPremiumDialogOpen] = useState(false);
-    const [algoliaConfig, setAlgoliaConfig] = useState<{ appId: string, searchKey: string } | null>(null);
     const [isSearching, setIsSearching] = useState(false);
     const [algoliaClient, setAlgoliaClient] = useState<any>(null);
 
@@ -76,15 +76,15 @@ export default function DiscoverPage() {
                 getAlgoliaConfig()
                     .then((result) => {
                         const config = result.data as { appId: string, searchKey: string };
-                        setAlgoliaConfig(config);
                         
-                        const algoliasearch = (algoliasearchNs as any).default || algoliasearchNs;
+                        // Robust way to get the search function, as suggested by AI
+                        const algoliaSearchFunction = (algoliasearch as any).default || algoliasearch;
 
-                        if (typeof algoliasearch === 'function') {
-                            const client = algoliasearch(config.appId, config.searchKey);
+                        if (typeof algoliaSearchFunction === 'function') {
+                            const client = algoliaSearchFunction(config.appId, config.searchKey);
                             setAlgoliaClient(client);
                         } else {
-                            console.error('Could not initialize Algolia search. The search function is not available.');
+                            console.error('Could not initialize Algolia. The search function is not available.');
                         }
                     })
                     .catch((error) => {
