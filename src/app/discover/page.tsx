@@ -24,6 +24,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { functions } from '@/lib/firebase';
 
+
 // Initialize Algolia
 const getAlgoliaConfig = httpsCallable(functions, 'getAlgoliaConfig');
 
@@ -36,6 +37,7 @@ export default function DiscoverPage() {
     const [algoliaConfig, setAlgoliaConfig] = useState<{ appId: string, searchKey: string } | null>(null);
     const [isSearching, setIsSearching] = useState(false);
     const [algoliaClient, setAlgoliaClient] = useState<any>(null);
+
 
     const usersIndex = useMemo(() => {
         if (algoliaClient) {
@@ -93,14 +95,31 @@ export default function DiscoverPage() {
         const initializeAlgolia = async () => {
             if (algoliaConfig && !algoliaClient) {
                 try {
-                    const algoliasearchModule = await import('algoliasearch/lite');
-                    const algoliasearch = algoliasearchModule.liteClient;
+                    const algoliasearchModule = await import('algoliasearch');
 
+                    console.log("--- ALGOLIA DEBUGGER --- START ---");
+
+                    try {
+                        const keys = Object.keys(algoliasearchModule);
+                        console.log("ALGOLIA KEYS:", keys.join(', '));
+
+                        for (const key of keys) {
+                            console.log(`ALGOLIA TYPEOF [${key}] is`, typeof algoliasearchModule[key]);
+                        }
+                    } catch (e) {
+                        console.log("ALGOLIA ERROR: Could not get object keys.");
+                    }
+
+                    console.log("ALGOLIA TYPEOF [.default] is", typeof algoliasearchModule.default);
+                    console.log("--- ALGOLIA DEBUGGER --- END ---");
+
+
+                    const algoliasearch = algoliasearchModule.default || algoliasearchModule;
                     if (typeof algoliasearch === 'function') {
                         const client = algoliasearch(algoliaConfig.appId, algoliaConfig.searchKey);
                         setAlgoliaClient(client);
                     } else {
-                        console.error('Failed to import algoliasearch: algoliasearchModule.liteClient is not a function.');
+                        console.error('Failed to import algoliasearch as a function.');
                     }
                 } catch (error) {
                     console.error("Error dynamically importing Algolia:", error);
@@ -110,6 +129,7 @@ export default function DiscoverPage() {
 
         initializeAlgolia();
     }, [algoliaConfig, algoliaClient]);
+
 
     const handleNearbyChange = (checked: boolean) => {
         if (!userProfile?.isPremium && !checked) {
@@ -171,6 +191,7 @@ export default function DiscoverPage() {
         }
     };
     
+    
     const handlePremiumFeatureClick = () => {
         if (!userProfile?.isPremium) {
             setIsPremiumDialogOpen(true);
@@ -209,7 +230,7 @@ export default function DiscoverPage() {
                         >
                           <ToggleGroupItem value="Homme" aria-label="Montrer les hommes" className="text-sm h-9">Homme</ToggleGroupItem>
                           <ToggleGroupItem value="Femme" aria-label="Montrer les femmes" className="text-sm h-9">Femme</ToggleGroupItem>
-                          <ToggleGroupItem value="Autre" aria-label="Montrer les autres personnes" className="text-sm h-9">Autre</ToggleGroupItem>
+                          <ToggleGroupItem value="Autre" aria-label="Montrer les autres personnes" className="text-sm h-9">Autre</Toggle_group_item>
                         </ToggleGroup>
                       </div>
                     </div>
