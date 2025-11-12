@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import * as algoliasearch from 'algoliasearch/lite'; // Correct import method
+import algoliasearch from 'algoliasearch/lite'; // Corrected import
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -76,14 +76,11 @@ export default function DiscoverPage() {
                 getAlgoliaConfig()
                     .then((result) => {
                         const config = result.data as { appId: string, searchKey: string };
-                        
-                        const algoliaSearchFunction = (algoliasearch as any).default || algoliasearch;
-
-                        if (typeof algoliaSearchFunction === 'function') {
-                            const client = algoliaSearchFunction(config.appId, config.searchKey);
+                        if (config && config.appId && config.searchKey) {
+                            const client = algoliasearch(config.appId, config.searchKey);
                             setAlgoliaClient(client);
                         } else {
-                            console.error('Could not initialize Algolia. The search function is not available.');
+                            console.error('Could not initialize Algolia. Invalid config received from Firebase function.');
                         }
                     })
                     .catch((error) => {
