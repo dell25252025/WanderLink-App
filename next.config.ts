@@ -1,6 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -11,28 +10,28 @@ const nextConfig = {
     unoptimized: true,
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: 'placehold.co',
+        protocol: 'https'',
+        hostname: 'placehold.co'',
         port: '',
-        pathname: '/**',
+        pathname: '/**'',
       },
       {
-        protocol: 'https',
-        hostname: 'picsum.photos',
+        protocol: 'https'',
+        hostname: 'picsum.photos'',
         port: '',
-        pathname: '/**',
+        pathname: '/**'',
       },
       {
-        protocol: 'https',
-        hostname: 'firebasestorage.googleapis.com',
+        protocol: 'https'',
+        hostname: 'firebasestorage.googleapis.com'',
         port: '',
-        pathname: '/**',
+        pathname: '/**'',
       },
       {
-        protocol: 'https',
-        hostname: 'lh3.googleusercontent.com',
+        protocol: 'https'',
+        hostname: 'lh3.googleusercontent.com'',
         port: '',
-        pathname: '/**',
+        pathname: '/**'',
       }
     ],
   },
