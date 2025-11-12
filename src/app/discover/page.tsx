@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import * as algoliasearch from 'algoliasearch/lite';
+import * as algoliasearchNs from 'algoliasearch';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -25,12 +25,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { functions } from '@/lib/firebase';
 
-
 // Initialize Algolia
 const getAlgoliaConfig = httpsCallable(functions, 'getAlgoliaConfig');
-
-// The algolia object is not a function, so we need to use the `liteClient` property
-const algoliaSearchFunction = (algoliasearch as any).liteClient || (algoliasearch as any).default;
 
 export default function DiscoverPage() {
     const router = useRouter();
@@ -75,15 +71,17 @@ export default function DiscoverPage() {
                             setShowMe('Femme');
                         }
                     }
-                    // setLoading(false) is now called after Algolia config is fetched
                 });
 
                 getAlgoliaConfig()
                     .then((result) => {
                         const config = result.data as { appId: string, searchKey: string };
                         setAlgoliaConfig(config);
-                        if (typeof algoliaSearchFunction === 'function') {
-                            const client = algoliaSearchFunction(config.appId, config.searchKey);
+                        
+                        const algoliasearch = (algoliasearchNs as any).default || algoliasearchNs;
+
+                        if (typeof algoliasearch === 'function') {
+                            const client = algoliasearch(config.appId, config.searchKey);
                             setAlgoliaClient(client);
                         } else {
                             console.error('Could not initialize Algolia search. The search function is not available.');
@@ -93,7 +91,7 @@ export default function DiscoverPage() {
                         console.error("Error fetching Algolia config:", error);
                     })
                     .finally(() => {
-                        setLoading(false); // Stop loading after all setup is done
+                        setLoading(false);
                     });
 
             } else {
@@ -103,7 +101,6 @@ export default function DiscoverPage() {
         });
         return () => unsubscribe();
     }, [router]);
-
 
     const handleNearbyChange = (checked: boolean) => {
         if (!userProfile?.isPremium && !checked) {
@@ -124,7 +121,7 @@ export default function DiscoverPage() {
     };
 
     const handleSearch = async () => {
-        if (!usersIndex || !userProfile) return;
+        if (!usersIndex || !userProfile || !currentUser) return;
         setIsSearching(true);
     
         const filters = [];
@@ -140,8 +137,7 @@ export default function DiscoverPage() {
         if (travelStyle && travelStyle !== 'Tous' && userProfile.isPremium) filters.push(`travelStyle:"${travelStyle}"`);
         if (activities && activities !== 'Toutes' && userProfile.isPremium) filters.push(`activities:"${activities}"`);
     
-        // Ensure we don't find the current user in the results
-        filters.push(`NOT objectID:${currentUser?.uid}`);
+        filters.push(`NOT objectID:${currentUser.uid}`);
     
         const searchOptions: any = {
             filters: filters.join(' AND '),
@@ -150,12 +146,12 @@ export default function DiscoverPage() {
     
         if (nearby && userProfile.latitude && userProfile.longitude) {
             searchOptions.aroundLatLng = `${userProfile.latitude}, ${userProfile.longitude}`;
-            searchOptions.aroundRadius = 50000; // 50km in meters
+            searchOptions.aroundRadius = 50000; // 50km
         }
     
         try {
             const { hits } = await usersIndex.search('', searchOptions);
-            const searchResults = hits.map(hit => ({ ...hit, _highlightResult: undefined, _snippetResult: undefined, objectID: undefined }));
+            const searchResults = hits.map((hit: any) => ({ ...hit, _highlightResult: undefined, _snippetResult: undefined, objectID: undefined }));
             localStorage.setItem('searchResults', JSON.stringify(searchResults));
             router.push('/');
         } catch (error) {
@@ -164,7 +160,6 @@ export default function DiscoverPage() {
             setIsSearching(false);
         }
     };
-    
     
     const handlePremiumFeatureClick = () => {
         if (!userProfile?.isPremium) {
@@ -188,38 +183,27 @@ export default function DiscoverPage() {
             <WanderlinkHeader />
             <main className="pt-12 pb-24">
                 <div className="container mx-auto max-w-4xl px-4">
-                     {/* Montre-moi Section */}
                     <div className="space-y-2 mb-4">
-                      <div className="flex items-center justify-between">
-                        <h2 className="font-semibold text-sm">Montre-moi</h2>
-                      </div>
+                      <h2 className="font-semibold text-sm">Montre-moi</h2>
                       <div className="flex justify-center">
                         <ToggleGroup
                           type="single"
                           value={showMe}
                           onValueChange={(value) => { if (value) setShowMe(value) }}
                           className="w-auto justify-start bg-slate-100 dark:bg-slate-800 p-1 rounded-full"
-                          variant='outline'
-                          size="default"
                         >
                           <ToggleGroupItem value="Homme" aria-label="Montrer les hommes" className="text-sm h-9">Homme</ToggleGroupItem>
                           <ToggleGroupItem value="Femme" aria-label="Montrer les femmes" className="text-sm h-9">Femme</ToggleGroupItem>
-                          <ToggleGroupItem value="Autre" aria-label="Montrer les autres personnes" className="text-sm h-9">Autre</ToggleGroupItem>
+                          <ToggleGroupItem value="Autre" aria-label="Montrer les autres" className="text-sm h-9">Autre</ToggleGroupItem>
                         </ToggleGroup>
                       </div>
                     </div>
                 
                     <div className="space-y-4">
-                        {/* Age Section */}
                         <div className="rounded-lg border bg-card p-3">
-                            <AgeRangeSlider
-                                value={ageRange}
-                                onValueChange={setAgeRange}
-                                className="text-sm"
-                            />
+                            <AgeRangeSlider value={ageRange} onValueChange={setAgeRange} />
                         </div>
 
-                        {/* Position Section */}
                         <div className="space-y-1">
                             <h2 className="font-semibold text-sm">Position</h2>
                             <div className="rounded-lg border bg-card p-2 space-y-2">
@@ -240,17 +224,11 @@ export default function DiscoverPage() {
                                 <Separator />
                                 <div className="flex items-center justify-between py-1 px-1 text-sm">
                                     <span className="text-muted-foreground">Destination</span>
-                                    <CountrySelect 
-                                        className={uniformSelectClass} 
-                                        value={destination} 
-                                        onValueChange={setDestination} 
-                                        placeholder="Toutes"
-                                    />
+                                    <CountrySelect className={uniformSelectClass} value={destination} onValueChange={setDestination} placeholder="Toutes" />
                                 </div>
                             </div>
                         </div>
 
-                        {/* Dates de voyage Section */}
                         <div className="space-y-2">
                           <h2 className="font-semibold text-sm">Dates de voyage</h2>
                             <div className="rounded-lg border bg-card p-3 space-y-3">
@@ -262,7 +240,6 @@ export default function DiscoverPage() {
                             </div>
                         </div>
 
-                        {/* Voyage Section */}
                         <div className="space-y-1">
                             <h2 className="font-semibold text-sm">Filtres Avancés</h2>
                             <div className="rounded-lg border bg-card p-2 space-y-2">
@@ -272,14 +249,7 @@ export default function DiscoverPage() {
                                             <span className={cn('text-muted-foreground', !isPremium && 'opacity-50')}>Intention</span>
                                             {!isPremium && <Crown className="h-4 w-4 text-yellow-500" />}
                                         </div>
-                                        <GenericSelect 
-                                            className={uniformSelectClass}
-                                            value={intention} 
-                                            onValueChange={setIntention} 
-                                            options={[{ value: '', label: 'Toutes' }, ...travelIntentions]}
-                                            placeholder="Toutes"
-                                            disabled={!isPremium}
-                                        />
+                                        <GenericSelect className={uniformSelectClass} value={intention} onValueChange={setIntention} options={[{ value: '', label: 'Toutes' }, ...travelIntentions]} placeholder="Toutes" disabled={!isPremium} />
                                     </div>
                                 </div>
                                 <Separator />
@@ -289,14 +259,7 @@ export default function DiscoverPage() {
                                             <span className={cn('text-muted-foreground', !isPremium && 'opacity-50')}>Style de voyage</span>
                                             {!isPremium && <Crown className="h-4 w-4 text-yellow-500" />}
                                         </div>
-                                        <GenericSelect 
-                                            className={uniformSelectClass}
-                                            value={travelStyle} 
-                                            onValueChange={setTravelStyle} 
-                                            options={travelStyles} 
-                                            placeholder="Tous"
-                                            disabled={!isPremium}
-                                        />
+                                        <GenericSelect className={uniformSelectClass} value={travelStyle} onValueChange={setTravelStyle} options={travelStyles} placeholder="Tous" disabled={!isPremium} />
                                     </div>
                                 </div>
                                 <Separator />
@@ -306,19 +269,11 @@ export default function DiscoverPage() {
                                             <span className={cn('text-muted-foreground', !isPremium && 'opacity-50')}>Activités</span>
                                             {!isPremium && <Crown className="h-4 w-4 text-yellow-500" />}
                                         </div>
-                                        <GenericSelect 
-                                            className={uniformSelectClass}
-                                            value={activities} 
-                                            onValueChange={setActivities} 
-                                            options={travelActivities} 
-                                            placeholder="Toutes"
-                                            disabled={!isPremium}
-                                        />
+                                        <GenericSelect className={uniformSelectClass} value={activities} onValueChange={setActivities} options={travelActivities} placeholder="Toutes" disabled={!isPremium} />
                                     </div>
                                 </div>
                             </div>
                         </div>
-
                     </div>
                 </div>
             </main>
@@ -337,7 +292,7 @@ export default function DiscoverPage() {
                             Fonctionnalité WanderLink Gold
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                            Passez à Gold pour débloquer le Mode Passeport et les filtres avancés, et trouver le partenaire de voyage idéal où que vous soyez.
+                            Passez à Gold pour débloquer le Mode Passeport et les filtres avancés.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
