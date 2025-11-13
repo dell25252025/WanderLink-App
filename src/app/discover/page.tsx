@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-// Final attempt with require-style import for maximum compatibility
 import algoliasearch = require('algoliasearch/lite'); 
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -77,7 +76,9 @@ export default function DiscoverPage() {
                     .then((result) => {
                         const config = result.data as { appId: string, searchKey: string };
                         if (config && config.appId && config.searchKey) {
-                            const client = algoliasearch(config.appId, config.searchKey);
+                            // Robust way to handle module interop issues
+                            const algoliaInit = (algoliasearch as any).default || algoliasearch;
+                            const client = algoliaInit(config.appId, config.searchKey);
                             setAlgoliaClient(client);
                         } else {
                             console.error('Could not initialize Algolia. Invalid config received.');
