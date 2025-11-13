@@ -8,20 +8,19 @@ import algoliasearch from 'algoliasearch';
 // À n'utiliser qu'en environnement de développement.
 
 // --- CONFIGURATION ---
-// Remplacer par vos véritables informations Algolia
-const ALGOLIA_APP_ID = 'H38LS2Y5J2';
-const ALGOLIA_ADMIN_KEY = 'd537a54483a3036e38d689115f59636f'; 
-const ALGOLIA_INDEX_NAME = 'users';
+const ALGOLIA_APP_ID = "H38LS2Y5J2";
+const ALGOLIA_ADMIN_KEY = "d537a54483a3036e38d689115f59636f"; 
+const ALGOLIA_INDEX_NAME = "users";
 
 async function cleanup() {
   try {
     // --- Nettoyage de Firestore ---
-    console.log('Démarrage du nettoyage de Firestore...');
-    const usersCollection = collection(db, 'users');
+    console.log("Démarrage du nettoyage de Firestore...");
+    const usersCollection = collection(db, "users");
     const querySnapshot = await getDocs(usersCollection);
     
     if (querySnapshot.empty) {
-      console.log('La collection "users" de Firestore est déjà vide.');
+      console.log("La collection \"users\" de Firestore est déjà vide.");
     } else {
       const batch = writeBatch(db);
       querySnapshot.forEach(doc => {
@@ -32,26 +31,26 @@ async function cleanup() {
     }
 
     // --- Nettoyage d'Algolia ---
-    console.log('\nDémarrage du nettoyage d'Algolia...');
+    console.log("\nDémarrage du nettoyage d'Algolia...");
     if (!ALGOLIA_APP_ID || !ALGOLIA_ADMIN_KEY) {
         throw new Error("Les identifiants Admin d'Algolia ne sont pas configurés.");
     }
     const client = algoliasearch(ALGOLIA_APP_ID, ALGOLIA_ADMIN_KEY);
     const index = client.initIndex(ALGOLIA_INDEX_NAME);
     
-    const { nbHits } = await index.search('', { attributesToRetrieve: [], hitsPerPage: 0 });
+    const { nbHits } = await index.search("", { attributesToRetrieve: [], hitsPerPage: 0 });
 
     if (nbHits === 0) {
-        console.log(`L'index "${ALGOLIA_INDEX_NAME}" d'Algolia est déjà vide.`);
+        console.log(`L'index \"${ALGOLIA_INDEX_NAME}\" d'Algolia est déjà vide.`);
     } else {
         await index.clearObjects();
-        console.log(`✅ ${nbHits} objets supprimés de l'index "${ALGOLIA_INDEX_NAME}" d'Algolia.`);
+        console.log(`✅ ${nbHits} objets supprimés de l'index \"${ALGOLIA_INDEX_NAME}\" d'Algolia.`);
     }
 
-    console.log('\n🎉 Nettoyage terminé avec succès !');
+    console.log("\n🎉 Nettoyage terminé avec succès !");
 
   } catch (error) {
-    console.error('❌ Une erreur est survenue pendant le nettoyage:', error);
+    console.error("❌ Une erreur est survenue pendant le nettoyage:", error);
   }
 }
 
