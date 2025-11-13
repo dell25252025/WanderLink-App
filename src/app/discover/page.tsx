@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-// Correct way to import for modern bundlers to avoid warnings
 import algoliasearch from 'algoliasearch/lite'; 
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -77,7 +76,6 @@ export default function DiscoverPage() {
                     .then((result) => {
                         const config = result.data as { appId: string, searchKey: string };
                         if (config && config.appId && config.searchKey) {
-                            // This direct initialization is now possible with the correct import
                             const client = algoliasearch(config.appId, config.searchKey);
                             setAlgoliaClient(client);
                         } else {
