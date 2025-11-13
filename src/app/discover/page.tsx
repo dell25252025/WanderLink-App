@@ -76,7 +76,8 @@ export default function DiscoverPage() {
                         const config = result.data as { appId: string, searchKey: string };
 
                         if (config && config.appId && config.searchKey) {
-                            const algoliaModule = await import('algoliasearch/lite');
+                            // Using the full 'algoliasearch' package for better compatibility
+                            const algoliaModule = await import('algoliasearch');
                             const algoliaInit = algoliaModule.default || algoliaModule;
 
                             if (typeof algoliaInit !== 'function') {
