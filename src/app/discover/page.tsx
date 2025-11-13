@@ -26,6 +26,10 @@ import { functions } from '@/lib/firebase';
 
 const getAlgoliaConfig = httpsCallable(functions, 'getAlgoliaConfig');
 
+declare global {
+    interface Window { algoliasearch: any; }
+}
+
 export default function DiscoverPage() {
     const router = useRouter();
     const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -70,35 +74,38 @@ export default function DiscoverPage() {
                     }
                 });
 
-                const initAlgolia = async () => {
-                    try {
-                        const result = await getAlgoliaConfig();
+                getAlgoliaConfig()
+                    .then(result => {
                         const config = result.data as { appId: string, searchKey: string };
-
-                        if (config && config.appId && config.searchKey) {
-                            // Using the full 'algoliasearch' package for better compatibility
-                            const algoliaModule = await import('algoliasearch');
-                            const algoliaInit = algoliaModule.default || algoliaModule;
-
-                            if (typeof algoliaInit !== 'function') {
-                                console.error("Failed to load Algolia search function.", algoliaInit);
-                                setLoading(false);
-                                return;
-                            }
-
-                            const client = algoliaInit(config.appId, config.searchKey);
-                            setAlgoliaClient(client);
-                        } else {
+                        if (!config || !config.appId || !config.searchKey) {
                             console.error('Could not initialize Algolia. Invalid config received.');
+                            setLoading(false);
+                            return;
                         }
-                    } catch (error) {
-                        console.error("Error initializing Algolia:", error);
-                    } finally {
-                        setLoading(false);
-                    }
-                };
 
-                initAlgolia();
+                        const script = document.createElement('script');
+                        script.src = 'https://cdn.jsdelivr.net/npm/algoliasearch@4/dist/algoliasearch-lite.umd.js';
+                        script.async = true;
+                        script.onload = () => {
+                            const algoliaInit = window.algoliasearch;
+                            if (typeof algoliaInit === 'function') {
+                                const client = algoliaInit(config.appId, config.searchKey);
+                                setAlgoliaClient(client);
+                            } else {
+                                console.error('Algolia UMD not loaded correctly:', algoliaInit);
+                            }
+                            setLoading(false);
+                        };
+                        script.onerror = () => {
+                            console.error('Failed to load the Algolia script from CDN.');
+                            setLoading(false);
+                        };
+                        document.body.appendChild(script);
+                    })
+                    .catch((error) => {
+                        console.error("Error fetching Algolia config:", error);
+                        setLoading(false);
+                    });
 
             } else {
                 setLoading(false);
