@@ -1,4 +1,4 @@
-
+ 
 import { db } from './src/lib/firebase';
 import { collection, getDocs, writeBatch } from 'firebase/firestore';
 const algoliasearch = require('algoliasearch');
