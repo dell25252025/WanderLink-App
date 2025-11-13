@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import algoliasearch from 'algoliasearch/lite'; 
+// Final attempt with require-style import for maximum compatibility
+import algoliasearch = require('algoliasearch/lite'); 
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
