@@ -1,7 +1,8 @@
 
 import { db } from './src/lib/firebase';
 import { collection, getDocs, writeBatch } from 'firebase/firestore';
-import algoliasearch from 'algoliasearch';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const algoliasearch = require('algoliasearch');
 
 // --- CONFIGURATION ---
 const ALGOLIA_APP_ID = "H38LS2Y5J2";
@@ -48,6 +49,8 @@ async function cleanup() {
   } catch (error) {
     console.error('❌ Une erreur est survenue pendant le nettoyage:', error);
     process.exit(1);
+  } finally {
+      process.exit(0);
   }
 }
 
