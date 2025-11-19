@@ -20,6 +20,7 @@
     "@capacitor/camera": "^6.1.2",
     "@capacitor/core": "^6.1.1",
     "@capacitor/geolocation": "^6.0.0",
+    "@capacitor/http": "^0.0.2",
     "@genkit-ai/googleai": "^1.14.1",
     "@genkit-ai/next": "^1.14.1",
     "@hookform/resolvers": "^4.1.3",
