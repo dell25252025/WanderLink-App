@@ -3,26 +3,29 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Send, MoreVertical, Ban, ShieldAlert, Smile, X, Phone, Video, Loader2, CheckCircle, Plus, ImageIcon, Camera } from 'lucide-react';
+import { ArrowLeft, Send, MoreVertical, Smile, X, Phone, Video, Loader2, CheckCircle, Plus, ImageIcon, Camera } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { getUserProfile } from '@/lib/firebase-actions';
 import { auth, db, storage } from '@/lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { Drawer, DrawerContent, DrawerTrigger, DrawerClose, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer';
+import { Drawer, DrawerContent, DrawerTrigger } from '@/components/ui/drawer';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import Picker, { type EmojiClickData, Categories, EmojiStyle } from 'emoji-picker-react';
-import { Dialog, DialogContent, DialogTrigger, DialogClose, DialogTitle, DialogDescription, DialogHeader } from '@/components/ui/dialog';
+import Picker, { type EmojiClickData, EmojiStyle } from 'emoji-picker-react';
+import { Dialog, DialogContent, DialogTrigger, DialogClose, DialogTitle, DialogHeader } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { ReportAbuseDialog } from '@/components/report-abuse-dialog';
 import { useMediaQuery } from '@/hooks/use-media-query';
-import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, setDoc, writeBatch, increment } from 'firebase/firestore'; // MODIFIÉ: Ajout de writeBatch et increment
+import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, setDoc, writeBatch, increment } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import type { DocumentData, Timestamp } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
+import type { DocumentData, Timestamp } from 'firebase/firestore';
+// MODIFIÉ: Ajout des imports pour Capacitor Camera
+import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
+
 
 interface Message {
   id: string;
@@ -60,7 +63,6 @@ export default function ChatClientPage({ otherUserId }: { otherUserId: string })
     }
   }, [otherUserId]);
 
-  // MODIFIÉ: Écoute des messages ET mise à zéro du compteur de non-lus
   useEffect(() => {
     if (!currentUser) return;
     const chatId = getChatId(currentUser.uid, otherUserId);
@@ -76,7 +78,6 @@ export default function ChatClientPage({ otherUserId }: { otherUserId: string })
       setMessages(msgs);
       setLoadingMessages(false);
 
-      // Quand on lit les messages, on met le compteur de non-lus pour NOUS à 0
       const chatDocRef = doc(db, 'chats', chatId);
       setDoc(chatDocRef, { 
           unreadCount: { [currentUser.uid]: 0 }
@@ -90,7 +91,6 @@ export default function ChatClientPage({ otherUserId }: { otherUserId: string })
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // MODIFIÉ: La fonction d'envoi gère maintenant le compteur de non-lus
   const sendMessage = async (text: string | null, imageUrl: string | null) => {
     if (!currentUser || !otherUser) return;
 
@@ -100,8 +100,6 @@ export default function ChatClientPage({ otherUserId }: { otherUserId: string })
 
     try {
         const batch = writeBatch(db);
-
-        // 1. Ajouter le nouveau message
         const newMessageRef = doc(messagesColRef);
         batch.set(newMessageRef, {
             text,
@@ -110,7 +108,6 @@ export default function ChatClientPage({ otherUserId }: { otherUserId: string })
             timestamp: serverTimestamp(),
         });
 
-        // 2. Mettre à jour le document principal du chat
         batch.set(chatDocRef, {
             participants: [currentUser.uid, otherUserId],
             participantDetails: {
@@ -122,7 +119,6 @@ export default function ChatClientPage({ otherUserId }: { otherUserId: string })
               senderId: currentUser.uid,
               timestamp: serverTimestamp(),
             },
-            // Incrémenter le compteur pour l'AUTRE utilisateur
             unreadCount: { [otherUserId]: increment(1) }
         }, { merge: true });
         
@@ -151,10 +147,8 @@ export default function ChatClientPage({ otherUserId }: { otherUserId: string })
       try {
           const imageId = uuidv4();
           const storageRef = ref(storage, `chat_images/${getChatId(currentUser.uid, otherUserId)}/${imageId}`);
-
           const snapshot = await uploadBytes(storageRef, file);
           const downloadURL = await getDownloadURL(snapshot.ref);
-
           await sendMessage(null, downloadURL);
           toast({ title: "Image envoyée !" });
       } catch (error) {
@@ -170,8 +164,38 @@ export default function ChatClientPage({ otherUserId }: { otherUserId: string })
       if (e.target.files && e.target.files[0]) {
           handleImageSend(e.target.files[0]);
       }
-      e.target.value = ''; // Reset input
+      e.target.value = ''; 
   }
+  
+  // MODIFIÉ: Nouvelle fonction pour gérer l'ouverture de la caméra
+  const handleCameraOpen = async () => {
+    try {
+      const image = await CapacitorCamera.getPhoto({
+        quality: 90,
+        allowEditing: false,
+        resultType: CameraResultType.Uri,
+        source: CameraSource.Camera,
+      });
+
+      if (image.webPath) {
+        const response = await fetch(image.webPath);
+        const blob = await response.blob();
+        const fileName = new Date().getTime() + '.jpeg';
+        const file = new File([blob], fileName, { type: 'image/jpeg' });
+        await handleImageSend(file);
+      }
+    } catch (error) {
+      console.error('Error taking photo:', error);
+      if (error.message && error.message.includes('User cancelled photos app')) {
+        return;
+      }
+      toast({
+        variant: 'destructive',
+        title: 'Erreur Caméra',
+        description: "Impossible d'accéder à la caméra. Veuillez vérifier les autorisations.",
+      });
+    }
+  };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey && !isDesktop) {
@@ -257,7 +281,8 @@ export default function ChatClientPage({ otherUserId }: { otherUserId: string })
               <PopoverTrigger asChild><Button type="button" variant="ghost" size="icon" className="shrink-0 h-8 w-8"><Plus className="h-4 w-4 text-muted-foreground" /></Button></PopoverTrigger>
               <PopoverContent className="w-auto p-1 mb-2"><div className="flex gap-1">
                   <Button type="button" variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()}><ImageIcon className="h-4 w-4" /></Button>
-                  <Button type="button" variant="ghost" size="icon"><Camera className="h-4 w-4" /></Button> { /* TODO */ }
+                   {/* MODIFIÉ: Le bouton appelle maintenant handleCameraOpen */}
+                  <Button type="button" variant="ghost" size="icon" onClick={handleCameraOpen}><Camera className="h-4 w-4" /></Button>
               </div></PopoverContent>
             </Popover>
           
