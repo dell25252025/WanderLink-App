@@ -253,14 +253,14 @@ export default function ChatClientPage({ otherUserId }: { otherUserId: string })
                     </Avatar>
                   )}
                   <div
-                    className={`max-w-[70%] rounded-2xl px-3 py-2 text-sm md:text-base ${
+                    className={`max-w-[70%] rounded-2xl px-3 py-2 text-sm md:text-base break-words ${
                       message.senderId === currentUser?.uid
                         ? 'rounded-br-none bg-primary text-primary-foreground'
                         : 'rounded-bl-none bg-secondary text-secondary-foreground'
                     }`}
                   >
                     {message.text}
-                    {/* TODO: L'envoi d'images et d'audio nécessite Firebase Storage - une prochaine étape */}
+                    {/* TODO: L\'envoi d\'images et d\'audio nécessite Firebase Storage - une prochaine étape */}
                   </div>
                 </div>
               ))}
