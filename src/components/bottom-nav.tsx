@@ -5,7 +5,8 @@ import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Compass, Users, MessageSquare, User, UserPlus, Settings } from 'lucide-react';
 import Link from 'next/link';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase'; // MODIFIÉ: import de db
+import { collection, query, where, onSnapshot } from 'firebase/firestore'; // MODIFIÉ: imports pour firestore
 import type { User as FirebaseUser } from 'firebase/auth';
 import { getUserProfile } from '@/lib/firebase-actions';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
@@ -15,6 +16,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/t
 const BottomNav = () => {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
+  const [totalUnread, setTotalUnread] = useState(0); // MODIFIÉ: état pour les messages non lus
   const pathname = usePathname();
 
   useEffect(() => {
@@ -38,6 +40,32 @@ const BottomNav = () => {
     });
     return () => unsubscribe();
   }, []);
+
+  // MODIFIÉ: Écouteur pour le total des messages non lus
+  useEffect(() => {
+    if (!currentUser) {
+        setTotalUnread(0);
+        return;
+    }
+
+    const q = query(
+      collection(db, 'chats'),
+      where('participants', 'array-contains', currentUser.uid)
+    );
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      let total = 0;
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.unreadCount && data.unreadCount[currentUser.uid]) {
+          total += data.unreadCount[currentUser.uid];
+        }
+      });
+      setTotalUnread(total);
+    });
+
+    return () => unsubscribe();
+  }, [currentUser]);
   
    const isDiscoverActive = pathname.startsWith('/discover');
    const isHomeActive = pathname === '/';
@@ -76,7 +104,7 @@ const BottomNav = () => {
   const NavItem = ({ item }: { item: typeof navItems[0] }) => (
     <Tooltip>
         <TooltipTrigger asChild>
-             <Link href={item.href} className="flex flex-col items-center justify-center h-full text-center">
+             <Link href={item.href} className="relative flex flex-col items-center justify-center h-full text-center"> { /* MODIFIÉ: Ajout de `relative` */ }
                 <div
                     className={cn(
                         'flex flex-col items-center justify-center rounded-full h-12 w-12 p-1 transition-colors duration-200',
@@ -85,6 +113,10 @@ const BottomNav = () => {
                 >
                     <item.icon className="h-6 w-6" />
                 </div>
+                { /* MODIFIÉ: Affichage de la pastille de notification */ }
+                {item.label === 'Messages' && totalUnread > 0 && (
+                    <span className="absolute top-1 right-1 flex h-2.5 w-2.5 items-center justify-center rounded-full bg-destructive text-[8px] font-bold text-destructive-foreground" />
+                )}
             </Link>
         </TooltipTrigger>
         <TooltipContent side="top" className="mb-2">

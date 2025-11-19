@@ -7,7 +7,7 @@ import { ArrowLeft, Send, MoreVertical, Ban, ShieldAlert, Smile, X, Phone, Video
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { getUserProfile } from '@/lib/firebase-actions';
-import { auth, db, storage } from '@/lib/firebase'; // NOTE: Import de storage
+import { auth, db, storage } from '@/lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { Drawer, DrawerContent, DrawerTrigger, DrawerClose, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer';
 import { useToast } from '@/hooks/use-toast';
@@ -19,14 +19,14 @@ import { Dialog, DialogContent, DialogTrigger, DialogClose, DialogTitle, DialogD
 import { Textarea } from '@/components/ui/textarea';
 import { ReportAbuseDialog } from '@/components/report-abuse-dialog';
 import { useMediaQuery } from '@/hooks/use-media-query';
-import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, setDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage"; // NOTE: Imports pour l'upload
+import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, setDoc, writeBatch, increment } from 'firebase/firestore'; // MODIFIÉ: Ajout de writeBatch et increment
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import type { DocumentData, Timestamp } from 'firebase/firestore';
-import { v4 as uuidv4 } from 'uuid'; // NOTE: Pour générer des IDs d'image uniques
+import { v4 as uuidv4 } from 'uuid';
 
 interface Message {
   id: string;
-  text: string | null; // Le texte est maintenant optionnel
+  text: string | null;
   senderId: string;
   timestamp: Timestamp;
   imageUrl?: string | null;
@@ -45,7 +45,7 @@ export default function ChatClientPage({ otherUserId }: { otherUserId: string })
   const [messages, setMessages] = useState<Message[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(true);
   const [newMessage, setNewMessage] = useState('');
-  const [isUploading, setIsUploading] = useState(false); // NOTE: État pour le chargement de l'upload
+  const [isUploading, setIsUploading] = useState(false);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
@@ -60,6 +60,7 @@ export default function ChatClientPage({ otherUserId }: { otherUserId: string })
     }
   }, [otherUserId]);
 
+  // MODIFIÉ: Écoute des messages ET mise à zéro du compteur de non-lus
   useEffect(() => {
     if (!currentUser) return;
     const chatId = getChatId(currentUser.uid, otherUserId);
@@ -74,6 +75,12 @@ export default function ChatClientPage({ otherUserId }: { otherUserId: string })
       });
       setMessages(msgs);
       setLoadingMessages(false);
+
+      // Quand on lit les messages, on met le compteur de non-lus pour NOUS à 0
+      const chatDocRef = doc(db, 'chats', chatId);
+      setDoc(chatDocRef, { 
+          unreadCount: { [currentUser.uid]: 0 }
+      }, { merge: true });
     });
 
     return () => unsubscribe();
@@ -83,7 +90,7 @@ export default function ChatClientPage({ otherUserId }: { otherUserId: string })
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // NOTE: Fonction générique pour envoyer un message (texte ou image)
+  // MODIFIÉ: La fonction d'envoi gère maintenant le compteur de non-lus
   const sendMessage = async (text: string | null, imageUrl: string | null) => {
     if (!currentUser || !otherUser) return;
 
@@ -92,25 +99,34 @@ export default function ChatClientPage({ otherUserId }: { otherUserId: string })
     const messagesColRef = collection(chatDocRef, 'messages');
 
     try {
-      await addDoc(messagesColRef, {
-        text,
-        imageUrl,
-        senderId: currentUser.uid,
-        timestamp: serverTimestamp(),
-      });
+        const batch = writeBatch(db);
 
-      await setDoc(chatDocRef, {
-        participants: [currentUser.uid, otherUserId],
-        participantDetails: {
-          [currentUser.uid]: { displayName: currentUser.displayName || 'Moi', photoURL: currentUser.photoURL || '' },
-          [otherUserId]: { displayName: otherUser.firstName || 'Utilisateur', photoURL: otherUser.profilePictures?.[0] || '', isVerified: otherUser.isVerified ?? false }
-        },
-        lastMessage: {
-          text: imageUrl ? '📷 Photo' : text,
-          senderId: currentUser.uid,
-          timestamp: serverTimestamp(),
-        },
-      }, { merge: true });
+        // 1. Ajouter le nouveau message
+        const newMessageRef = doc(messagesColRef);
+        batch.set(newMessageRef, {
+            text,
+            imageUrl,
+            senderId: currentUser.uid,
+            timestamp: serverTimestamp(),
+        });
+
+        // 2. Mettre à jour le document principal du chat
+        batch.set(chatDocRef, {
+            participants: [currentUser.uid, otherUserId],
+            participantDetails: {
+              [currentUser.uid]: { displayName: currentUser.displayName || 'Moi', photoURL: currentUser.photoURL || '' },
+              [otherUserId]: { displayName: otherUser.firstName || 'Utilisateur', photoURL: otherUser.profilePictures?.[0] || '', isVerified: otherUser.isVerified ?? false }
+            },
+            lastMessage: {
+              text: imageUrl ? '📷 Photo' : text,
+              senderId: currentUser.uid,
+              timestamp: serverTimestamp(),
+            },
+            // Incrémenter le compteur pour l'AUTRE utilisateur
+            unreadCount: { [otherUserId]: increment(1) }
+        }, { merge: true });
+        
+        await batch.commit();
 
     } catch (error) {
       console.error("Error sending message:", error);
@@ -126,7 +142,6 @@ export default function ChatClientPage({ otherUserId }: { otherUserId: string })
     }
   };
   
-  // NOTE: Nouvelle fonction pour gérer l'envoi d'images
   const handleImageSend = async (file: File) => {
       if (!file || !currentUser) return;
 
