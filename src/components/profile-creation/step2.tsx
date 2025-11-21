@@ -17,9 +17,11 @@ import { Button } from '@/components/ui/button';
 import { Crosshair, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { Geolocation } from '@capacitor/geolocation';
-import { Http } from '@capacitor/http';
-import { countries } from '@/lib/countries'; 
+import { countries } from '@/lib/countries';
+
+// Dynamically import Capacitor plugins only on the client-side
+const Geolocation = (async () => (await import('@capacitor/geolocation')).Geolocation)();
+const Http = (async () => (await import('@capacitor/http')).Http)();
 
 const allLanguages = [
     { id: 'fr', label: 'Français' },
@@ -62,14 +64,15 @@ const Step2 = () => {
   const handleLocate = async (isAutomatic = false) => {
     setIsLocating(true);
     try {
-      let permissionStatus = await Geolocation.checkPermissions();
+      const geo = await Geolocation;
+      let permissionStatus = await geo.checkPermissions();
 
       if (permissionStatus.location !== 'granted') {
         if (isAutomatic) {
           setIsLocating(false);
           return; 
         }
-        permissionStatus = await Geolocation.requestPermissions();
+        permissionStatus = await geo.requestPermissions();
         if (permissionStatus.location !== 'granted') {
           toast({ variant: 'destructive', title: "Permission refusée", description: "L'accès à la localisation a été refusé." });
           setIsLocating(false);
@@ -77,7 +80,7 @@ const Step2 = () => {
         }
       }
 
-      const position = await Geolocation.getCurrentPosition({ 
+      const position = await geo.getCurrentPosition({ 
         timeout: 15000, 
         enableHighAccuracy: false 
       });
@@ -96,7 +99,8 @@ const Step2 = () => {
         headers: { 'User-Agent': 'WanderLink/1.0 (tech.wanderlink.app)' }
       };
 
-      const response = await Http.get(options);
+      const http = await Http;
+      const response = await http.get(options);
       const data = response.data;
       
       const countryCode = data?.address?.country_code;
