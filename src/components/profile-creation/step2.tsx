@@ -18,10 +18,7 @@ import { Crosshair, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { countries } from '@/lib/countries';
-
-// Dynamically import Capacitor plugins only on the client-side
-const Geolocation = (async () => (await import('@capacitor/geolocation')).Geolocation)();
-const Http = (async () => (await import('@capacitor/http')).Http)();
+import { Capacitor } from '@capacitor/core';
 
 const allLanguages = [
     { id: 'fr', label: 'Français' },
@@ -62,17 +59,27 @@ const Step2 = () => {
   const { toast } = useToast();
 
   const handleLocate = async (isAutomatic = false) => {
+    if (!Capacitor.isNativePlatform()) {
+        console.log("Capacitor features are not available in the browser.");
+        if (!isAutomatic) {
+            toast({ variant: 'destructive', title: "Fonctionnalité non disponible", description: "La géolocalisation n'est disponible que sur l'application mobile." });
+        }
+        return;
+    }
+
     setIsLocating(true);
     try {
-      const geo = await Geolocation;
-      let permissionStatus = await geo.checkPermissions();
+      const { Geolocation } = await import('@capacitor/geolocation');
+      const { Http } = await import('@capacitor/http');
+
+      let permissionStatus = await Geolocation.checkPermissions();
 
       if (permissionStatus.location !== 'granted') {
         if (isAutomatic) {
           setIsLocating(false);
           return; 
         }
-        permissionStatus = await geo.requestPermissions();
+        permissionStatus = await Geolocation.requestPermissions();
         if (permissionStatus.location !== 'granted') {
           toast({ variant: 'destructive', title: "Permission refusée", description: "L'accès à la localisation a été refusé." });
           setIsLocating(false);
@@ -80,7 +87,7 @@ const Step2 = () => {
         }
       }
 
-      const position = await geo.getCurrentPosition({ 
+      const position = await Geolocation.getCurrentPosition({ 
         timeout: 15000, 
         enableHighAccuracy: false 
       });
@@ -99,8 +106,7 @@ const Step2 = () => {
         headers: { 'User-Agent': 'WanderLink/1.0 (tech.wanderlink.app)' }
       };
 
-      const http = await Http;
-      const response = await http.get(options);
+      const response = await Http.get(options);
       const data = response.data;
       
       const countryCode = data?.address?.country_code;
